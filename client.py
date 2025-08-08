@@ -93,10 +93,10 @@ def main():
         print(f"⏳ 解析延遲: {response_data.get('latency')} ms")
 
         # 處理按鈕點擊
-        click_target_data = decide_click_target("點擊深入研究",parsed_result)
-        print("📌 GPT-4o 判斷結果:", click_target_data)
-        print("🖱️ 嘗試點擊按鈕...")
-        click_target(click_target_data)
+        # click_target_data = decide_click_target("點擊深入研究",parsed_result)
+        # print("📌 GPT-4o 判斷結果:", click_target_data)
+        # print("🖱️ 嘗試點擊按鈕...")
+        # click_target(click_target_data)
     else:
         print("❌ 解析失敗，請檢查 API")
 
