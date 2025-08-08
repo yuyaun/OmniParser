@@ -12,7 +12,8 @@ from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processo
 import torch
 from PIL import Image
 
-yolo_model = get_yolo_model(model_path='weights/icon_detect/model.pt')
+# yolo_model = get_yolo_model(model_path='weights/icon_detect/best.pt')
+yolo_model = get_yolo_model(model_path='weights/icon_detect_v1_5/icon_detect_v1_5/model_v1_5.pt')
 caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
 # caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="weights/icon_caption_blip2")
 
@@ -27,7 +28,17 @@ MARKDOWN = """
 OmniParser is a screen parsing tool to convert general GUI screen to structured elements. 
 """
 
-DEVICE = torch.device('cuda')
+# DEVICE = torch.device('cuda')
+# Check if MPS is available (for Mac with Apple Silicon)
+if hasattr(torch, 'backends') and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+    DEVICE = torch.device('mps')
+# Fall back to CUDA if MPS is not available
+elif torch.cuda.is_available():
+    DEVICE = torch.device('cuda')
+# Fall back to CPU as last resort
+else:
+    DEVICE = torch.device('cpu')
+    print("Warning: Neither MPS nor CUDA is available. Using CPU instead.")
 
 # @spaces.GPU
 # @torch.inference_mode()
@@ -40,7 +51,10 @@ def process(
     imgsz
 ) -> Optional[Image.Image]:
 
-    box_overlay_ratio = image_input.size[0] / 3200
+    image_save_path = 'imgs/saved_image_demo.png'
+    image_input.save(image_save_path)
+    image = Image.open(image_save_path)
+    box_overlay_ratio = image.size[0] / 3200
     draw_bbox_config = {
         'text_scale': 0.8 * box_overlay_ratio,
         'text_thickness': max(int(2 * box_overlay_ratio), 1),
@@ -49,9 +63,14 @@ def process(
     }
     # import pdb; pdb.set_trace()
 
-    ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_input, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9}, use_paddleocr=use_paddleocr)
+    ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_save_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9}, use_paddleocr=use_paddleocr)
     text, ocr_bbox = ocr_bbox_rslt
-    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_input, yolo_model, BOX_TRESHOLD = box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold, imgsz=imgsz,)  
+    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(
+        image_save_path,
+        yolo_model,
+        BOX_TRESHOLD = box_threshold,
+        output_coord_in_ratio=True,
+        ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold, imgsz=imgsz,)  
     image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
     print('finish processing')
     parsed_content_list = '\n'.join([f'icon {i}: ' + str(v) for i,v in enumerate(parsed_content_list)])
